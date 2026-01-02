@@ -1,11 +1,10 @@
 from tkinter import Label, Tk, Button, Entry, Radiobutton
 from tkinter import messagebox, Toplevel, OptionMenu
 from tkinter import IntVar, StringVar, Frame
-from helper import Warehouse, trace, get_date, date_selection
+from helper import Warehouse, trace, get_date, date_selection, add_entry
 from dataclasses import dataclass
 import getpass
 import asyncio
-import threading
 import tracemalloc
 import logging
 
@@ -40,13 +39,6 @@ def end_process(root):
             return
     except Exception as error:
         print(trace(error))
-
-def add_entry(user: Warehouse, flow:str, title:str, amount:str):
-    def run_async():
-        async def add_coroutine(flow:str, title:str, amount:str):
-            await user.add_item(flow, title, amount)
-        asyncio.run(add_coroutine(flow, title, amount))
-    threading.Thread(target=run_async, daemon=True).start()
 
 def project(dropdown: IntVar, user: Warehouse):
     labels: list[str] = ['Item', 'Type', 'Amount']
@@ -113,8 +105,8 @@ def project(dropdown: IntVar, user: Warehouse):
         print(trace(error))
 
 def show_graph(display, base, action):
+    flow: Flow = Flow('income', 'debt')
     try:
-        flow: Flow = Flow('income', 'debt')
         _x_axis = None # Duration of measurement
         income: list[Warehouse] = base.get_entries(flow.income)
         income_list: list = [item[2] for item in income]
@@ -174,9 +166,6 @@ def start():
         root.mainloop()
     except Exception as error:
         print(trace(error))
-
-def decision(dropdown: Tk, base: Warehouse):
-    _action = dropdown.get()
 
 def delete(base, item: str, amount: float):
     types: list[str] = ['income', 'debt']
