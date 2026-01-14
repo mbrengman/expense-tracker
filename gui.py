@@ -17,7 +17,7 @@ class Flow:
     income: str
     debt: str
 
-def elements(warehouse: Warehouse, flow: str) -> list:
+def elements(warehouse: Warehouse, flow: str) -> list[tuple[str, str, int]]:
     number: int = asyncio.run(warehouse.length(flow))
     if number is not None:
         index: int = number if number <= 10 else 10
@@ -64,7 +64,7 @@ def project(dropdown: IntVar, user: Warehouse):
                 amount: Entry = Entry(display, width=50)
                 submit: Button = Button(display, text='submit', command=
                     lambda: add_entry(user, str(flow.get()), str(title.get()), str(amount.get())))
-                end: Tk = Button(display, text='End program', command=display.destroy)
+                end: Tk = Button(display, text='close window', command=display.destroy)
 
                 title.grid(column=2, row=0)
                 flow.grid(column=2, row=1)
