@@ -7,6 +7,7 @@ matplotlib.use('Agg')
 import matplotlib.pyplot as plt
 import logging
 import sqlite3
+import threading
 import os
 import io
 import asyncio
@@ -73,11 +74,11 @@ class Warehouse:
             conn.close()
 
     async def length(self, pay_type: str) -> int:
+        if not is_valid_pay(pay_type):
+            return 0
+        loop = asyncio.get_running_loop()
+        text = f'SELECT * FROM {pay_type}'
         try:
-            if not is_valid_pay(pay_type):
-                return 0
-            text = f'SELECT * FROM {pay_type}'
-            loop = asyncio.get_running_loop()
             def fetch_length():
                 conn = sqlite3.connect(self.location)
                 curr = conn.cursor()
@@ -89,10 +90,11 @@ class Warehouse:
                 finally:
                     curr.close()
                     conn.close()
-            return await loop.run_in_executor(None, fetch_length)
         except Exception as error:
             print(trace(error))
-
+        finally:
+            return await loop.run_in_executor(None, fetch_length)
+            
     async def present(self, pay_type: str):
         if not is_valid_pay(pay_type):
             return
@@ -113,7 +115,7 @@ class Warehouse:
         except Exception as error:
             print(trace(error))
 
-    async def line_graph(self, x_axis: list, y_axis: list) -> Image:
+    async def line(self, x_axis: list, y_axis: list) -> Image:
         loop = asyncio.get_running_loop()
         def create_graph():
             plt.plot(x_axis, y_axis)
@@ -127,7 +129,7 @@ class Warehouse:
         except Exception as error:
             print(trace(error))
 
-    async def bar_graph(self, x_axis: list, y_axis: list) -> Image:
+    async def bar(self, x_axis: list, y_axis: list) -> Image:
         loop = asyncio.get_running_loop()
         def create_graph():
             plt.bar(x_axis, y_axis)
@@ -248,14 +250,14 @@ class Warehouse:
         except Exception as error:
             print(trace(error))
 
-    async def from_date(self, pay_type: str, date: str = None):
+    async def from_date(self, pay_type:str, date:str=None) -> list:
         if not is_valid_pay(pay_type):
             return
         text = f'SELECT * FROM {pay_type} WHERE date >= ?'
         conn = sqlite3.connect(self.location)
         curr = conn.cursor()
         try:
-            date = get_date() if date is None else date
+            date = get_date() if not date else date
             curr.execute(text, (date,))
             return curr.fetchall()
         except Exception as error:
@@ -264,7 +266,7 @@ class Warehouse:
             curr.close()
             conn.close()
 
-    async def get_items(self, pay_type: str):
+    async def get_items(self, pay_type:str):
         if not is_valid_pay(pay_type):
             return
         text = f'SELECT * FROM {pay_type}'
@@ -358,6 +360,7 @@ class Date:
     month: int
     day: int
             
+
 def is_valid_pay(pay_type: str, amount: str=None):
     if '' == pay_type:
         print('income or debt specificity is required')
@@ -388,6 +391,62 @@ def date_selection(current: str, num_days: int):
             date.day = calendar._monthlen(date.year, date.month)
             date.month -= 1
         num_days -= 1
+
+def line_graph(user: Warehouse, flow:str, date: str) -> Image:
+    def run_async():
+        async def add_coroutine(flow, date):
+            return await user.line(user.from_date(flow, date), date_selection(get_date(), date))
+        asyncio.run(add_coroutine(flow, date))
+    threading.Thread(target=run_async, daemon=True).start()
+
+def bar_graph(user:Warehouse, flow:str, date:str) -> Image:
+    def run_async():
+        async def add_coroutine(flow, date):
+            return await user.bar(user.from_date(flow, date), date_selection(get_date(), date))
+        asyncio.run(add_coroutine(flow, date))
+    threading.Thread(target=run_async, daemon=True).start()
+
+def get_length(user:Warehouse, flow:str):
+    def run_async():
+        async def add_coroutine(flow):
+            return await user.length(flow)
+        asyncio.run(add_coroutine(flow))
+    threading.Thread(target=run_async, daemon=True).start()
+
+def total(user:Warehouse, flow:str):
+    def run_async():
+        async def add_coroutine(flow):
+            return await user.get_total(flow)
+        asyncio.run(add_coroutine(flow))
+    threading.Thread(target=run_async(), daemon=True).start()
+
+def average(user:Warehouse, flow:str):
+    def run_async():
+        async def add_coroutine(flow):
+            await user.get_average(flow)
+        asyncio.run(add_coroutine(flow))
+    threading.Thread(target=run_async(), daemon=True).start()
+
+def diff(user:Warehouse):
+    def run_async():
+        async def add_coroutine():
+            await user.difference()
+        asyncio.run(add_coroutine())
+    threading.Thread(target=run_async(), daemon=True).start()
+
+def rm(user:Warehouse, flow:str, title:str, amount:float):
+    def run_async():
+        async def add_coroutine():
+            await user.remove(flow, title, amount)
+        asyncio.run(add_coroutine(flow, title, amount))
+    threading.Thread(target=run_async(), daemon=True)
+
+def add_entry(user:Warehouse, flow:str, title:str, amount:str):
+    def run_async():
+        async def add_coroutine(flow:str, title:str, amount:str):
+            await user.add_item(flow, title, amount)
+        asyncio.run(add_coroutine(flow, title, amount))
+    threading.Thread(target=run_async(), daemon=True).start()
 
 def trace(e: str):
     error, value, line = sys.exc_info()
